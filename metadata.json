@@ -1,0 +1,5 @@
+{
+  "name": "ResumeCloner AI",
+  "description": "Upload any resume image to analyze its structure, then edit and generate your own version with the same format.",
+  "requestFramePermissions": []
+}
