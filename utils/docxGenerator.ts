@@ -1,16 +1,16 @@
 
-import { 
-  Document, 
-  Packer, 
-  Paragraph, 
-  TextRun, 
-  HeadingLevel, 
-  Table, 
-  TableRow, 
-  TableCell, 
-  WidthType, 
-  BorderStyle, 
-  AlignmentType, 
+import {
+  Document,
+  Packer,
+  Paragraph,
+  TextRun,
+  HeadingLevel,
+  Table,
+  TableRow,
+  TableCell,
+  WidthType,
+  BorderStyle,
+  AlignmentType,
   ShadingType,
   ITableBordersOptions
 } from "docx";
@@ -18,23 +18,23 @@ import FileSaver from "file-saver";
 import { ResumeData, Section, DetailItem, SkillItem, TEMPLATES } from "../types";
 
 export const generateDocx = async (data: ResumeData) => {
-  const { 
-    personalInfo, 
-    sections, 
-    templateId, 
-    fontFamily, 
-    nameFontSize, 
-    sectionHeaderFontSize, 
-    roleFontSize, 
-    bodyFontSize, 
+  const {
+    personalInfo,
+    sections,
+    templateId,
+    fontFamily,
+    nameFontSize,
+    sectionHeaderFontSize,
+    roleFontSize,
+    bodyFontSize,
     contactFontSize,
     headerTopPadding,
     headerBottomPadding,
     sectionTitleMargin,
-    moduleSpacing, 
-    lineHeight 
+    moduleSpacing,
+    lineHeight
   } = data;
-  
+
   const template = TEMPLATES.find(t => t.id === templateId) || TEMPLATES[0];
 
   const getFont = (id: string) => {
@@ -47,13 +47,13 @@ export const generateDocx = async (data: ResumeData) => {
   };
 
   const bodyFont = getFont(fontFamily);
-  const spacingAfterModule = moduleSpacing * 15; 
+  const spacingAfterModule = moduleSpacing * 15;
   const spacingAfterHeader = headerBottomPadding * 15;
   const spacingBeforeHeader = headerTopPadding * 15;
 
   const primaryColor = (data.accentColor || template.colors.primary).replace('#', '');
   const textColor = template.colors.text.replace('#', '');
-  
+
   const sidebarBgColor = template.colors.sidebarBg ? template.colors.sidebarBg.replace('#', '') : "F8FAFC";
   const sidebarTextColor = template.colors.sidebarBg?.startsWith('#1') || template.colors.sidebarBg?.startsWith('#0') ? "FFFFFF" : textColor;
   const isDarkSidebar = sidebarTextColor === "FFFFFF";
@@ -69,7 +69,7 @@ export const generateDocx = async (data: ResumeData) => {
 
   const parseStyledText = (text: string, color: string, size: number, baseItalic: boolean = false): TextRun[] => {
     if (!text) return [];
-    const parts = text.split(/(\*\*.*?\*\*|_.*?_)/g).filter(p => p !== undefined && p !== ""); 
+    const parts = text.split(/(\*\*.*?\*\*|_.*?_)/g).filter(p => p !== undefined && p !== "");
     return parts.map(part => {
       let content = part;
       let isBold = false;
@@ -80,7 +80,7 @@ export const generateDocx = async (data: ResumeData) => {
     });
   };
 
-  const createContactInfo = (align: AlignmentType, color: string) => {
+  const createContactInfo = (align: any, color: string) => {
     const parts = [personalInfo.email, personalInfo.phone, personalInfo.location, personalInfo.website].filter(Boolean);
     return new Paragraph({
       alignment: align,
@@ -107,27 +107,27 @@ export const generateDocx = async (data: ResumeData) => {
       text: section.title.toUpperCase(),
       heading: HeadingLevel.HEADING_2,
       spacing: { before: 240, after: Math.max(16, sectionTitleMargin) * 15 },
-      border: hasBottomBorder ? { 
-        bottom: { 
-          color: isSidebarColumn && isDarkSidebar ? "FFFFFF" : primaryColor, 
-          space: 14, 
-          value: BorderStyle.SINGLE, 
-          size: 18 
-        } 
+      border: hasBottomBorder ? {
+        bottom: {
+          color: isSidebarColumn && isDarkSidebar ? "FFFFFF" : primaryColor,
+          space: 14,
+          style: BorderStyle.SINGLE,
+          size: 18
+        }
       } : undefined,
       children: [new TextRun({ font: bodyFont, color: titleColor, size: sectionHeaderFontSize * 2, bold: true })]
     }));
 
     if (section.type === 'tag-list') {
       const skills = (section.items as SkillItem[]).map(s => s.name).join('  •  ');
-      output.push(new Paragraph({ 
-        children: [new TextRun({ text: skills, color: descColor, font: bodyFont, size: bodyFontSize * 2 })], 
-        spacing: { after: spacingAfterModule } 
+      output.push(new Paragraph({
+        children: [new TextRun({ text: skills, color: descColor, font: bodyFont, size: bodyFontSize * 2 })],
+        spacing: { after: spacingAfterModule }
       }));
     } else {
       (section.items as DetailItem[]).forEach((item, idx) => {
         const isLast = idx === section.items.length - 1;
-        
+
         const headerChildren: TextRun[] = [
           new TextRun({ text: item.title, bold: true, size: roleFontSize * 2, font: bodyFont, color: isSidebarColumn && isDarkSidebar ? "FFFFFF" : "000000" })
         ];
@@ -150,17 +150,18 @@ export const generateDocx = async (data: ResumeData) => {
 
         if (item.description) {
           item.description.split('\n').forEach(line => {
-             const trimmed = line.trim();
-             const isBullet = trimmed.startsWith('•') || trimmed.startsWith('-') || (trimmed.startsWith('*') && !trimmed.startsWith('**'));
-             const cleanLine = isBullet ? trimmed.substring(1).trim() : trimmed;
-             output.push(new Paragraph({
-               text: isBullet ? `• ${cleanLine}` : cleanLine,
-               bullet: isBullet ? { level: 0 } : undefined,
-               children: parseStyledText(cleanLine, descColor, bodyFontSize)
-             }));
+            const trimmed = line.trim();
+            const isBullet = trimmed.startsWith('•') || trimmed.startsWith('-') || (trimmed.startsWith('*') && !trimmed.startsWith('**'));
+            const cleanLine = isBullet ? trimmed.substring(1).trim() : trimmed;
+            output.push(new Paragraph({
+              text: isBullet ? `• ${cleanLine}` : cleanLine,
+              bullet: isBullet ? { level: 0 } : undefined,
+              children: parseStyledText(cleanLine, descColor, bodyFontSize)
+            }));
           });
         }
         if (isLast) {
+          // @ts-ignore
           output[output.length - 1].root[1].root.spacing = { after: spacingAfterModule };
         }
       });
@@ -168,7 +169,7 @@ export const generateDocx = async (data: ResumeData) => {
     return output;
   };
 
-  const buildHeader = (align: AlignmentType, isModern: boolean) => {
+  const buildHeader = (align: any, isModern: boolean) => {
     const textRuns = [
       new TextRun({ text: personalInfo.fullName.toUpperCase(), font: bodyFont, size: nameFontSize * 2, bold: true, color: isModern ? "FFFFFF" : "000000" })
     ];
@@ -176,10 +177,10 @@ export const generateDocx = async (data: ResumeData) => {
       textRuns.push(new TextRun({ text: "  |  ", font: bodyFont, size: nameFontSize * 2, color: isModern ? "CCCCCC" : "999999" }));
       textRuns.push(new TextRun({ text: personalInfo.jobTitle.toUpperCase(), font: bodyFont, size: nameFontSize * 2, bold: false, color: isModern ? "EEEEEE" : "666666" }));
     }
-    return new Paragraph({ 
-      alignment: align, 
-      children: textRuns, 
-      spacing: { before: spacingBeforeHeader, after: spacingAfterHeader } 
+    return new Paragraph({
+      alignment: align,
+      children: textRuns,
+      spacing: { before: spacingBeforeHeader, after: spacingAfterHeader }
     });
   };
 
@@ -192,14 +193,16 @@ export const generateDocx = async (data: ResumeData) => {
       elements.push(new Table({
         width: { size: 100, type: WidthType.PERCENTAGE },
         borders: noBorders,
-        rows: [new TableRow({ children: [new TableCell({
-          shading: { fill: primaryColor, type: ShadingType.CLEAR, color: "auto" },
-          margins: { top: spacingBeforeHeader, bottom: spacingAfterHeader, left: 400, right: 400 },
-          children: [
-            buildHeader(AlignmentType.LEFT, true),
-            createContactInfo(AlignmentType.LEFT, "FFFFFF")
-          ]
-        })]})]
+        rows: [new TableRow({
+          children: [new TableCell({
+            shading: { fill: primaryColor, type: ShadingType.CLEAR, color: "auto" },
+            margins: { top: spacingBeforeHeader, bottom: spacingAfterHeader, left: 400, right: 400 },
+            children: [
+              buildHeader(AlignmentType.LEFT, true),
+              createContactInfo(AlignmentType.LEFT, "FFFFFF")
+            ]
+          })]
+        })]
       }));
     } else {
       elements.push(buildHeader(align, false));
@@ -225,22 +228,23 @@ export const generateDocx = async (data: ResumeData) => {
     const col1Items = template.structure === 'sidebar-right' ? mainItems : sidebarItems;
     const col2Items = template.structure === 'sidebar-right' ? sidebarItems : mainItems;
     const renderCol = (items: Section[], isSide: boolean) => {
-        const out: Paragraph[] = [];
-        items.forEach(s => out.push(...createSection(s, isSide)));
-        return out;
+      const out: Paragraph[] = [];
+      items.forEach(s => out.push(...createSection(s, isSide)));
+      return out;
     };
     elements.push(new Table({
-        width: { size: 100, type: WidthType.PERCENTAGE },
-        borders: noBorders,
-        rows: [new TableRow({ children: [
-            new TableCell({ children: renderCol(col1Items, template.structure !== 'sidebar-right'), width: { size: 30, type: WidthType.PERCENTAGE }, shading: template.structure === 'sidebar-left' ? { fill: sidebarBgColor, type: ShadingType.CLEAR, color: "auto" } : undefined, margins: { top: 200, bottom: 200, left: 200, right: 200 } }),
-            new TableCell({ children: renderCol(col2Items, template.structure === 'sidebar-right'), width: { size: 70, type: WidthType.PERCENTAGE }, shading: template.structure === 'sidebar-right' ? { fill: sidebarBgColor, type: ShadingType.CLEAR, color: "auto" } : undefined, margins: { top: 200, bottom: 200, left: 200, right: 200 } })
-        ]})]
+      width: { size: 100, type: WidthType.PERCENTAGE },
+      borders: noBorders,
+      rows: [new TableRow({
+        children: [
+          new TableCell({ children: renderCol(col1Items, template.structure !== 'sidebar-right'), width: { size: 30, type: WidthType.PERCENTAGE }, shading: template.structure === 'sidebar-left' ? { fill: sidebarBgColor, type: ShadingType.CLEAR, color: "auto" } : undefined, margins: { top: 200, bottom: 200, left: 200, right: 200 } }),
+          new TableCell({ children: renderCol(col2Items, template.structure === 'sidebar-right'), width: { size: 70, type: WidthType.PERCENTAGE }, shading: template.structure === 'sidebar-right' ? { fill: sidebarBgColor, type: ShadingType.CLEAR, color: "auto" } : undefined, margins: { top: 200, bottom: 200, left: 200, right: 200 } })
+        ]
+      })]
     }));
     return elements;
   };
 
   const doc = new Document({ sections: [{ properties: { page: { margin: { top: 720, bottom: 720, left: 720, right: 720 } } }, children: template.structure.includes('sidebar') || template.structure === 'two-column-header' ? buildTwoColumn() : buildSingleColumn() }] });
-  const blob = await Packer.toBlob(doc);
-  FileSaver.saveAs(blob, `${personalInfo.fullName.replace(/\s+/g, '_') || 'Resume'}_Resume.docx`);
+  return Packer.toBlob(doc);
 };
