@@ -2,7 +2,12 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { ResumeData, Section, DetailItem, SkillItem, TEMPLATES } from "../types";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// Model key is injected from vite.config.ts.
+const apiKey = process.env.MODEL_API_KEY || process.env.GEMINI_API_KEY || process.env.API_KEY || "";
+if (!apiKey) {
+  console.error("Model API key is missing. Configure MODEL_API_KEY or GEMINI_API_KEY in .env.local and restart the dev server.");
+}
+const ai = new GoogleGenAI({ apiKey });
 
 /**
  * 辅助函数：从模型返回的字符串中提取纯 JSON 内容
@@ -33,7 +38,7 @@ export const analyzeResumeImage = async (base64Data: string): Promise<ResumeData
   const cleanBase64 = base64Data.split(',')[1] || base64Data;
 
   const response = await ai.models.generateContent({
-    model: 'gemini-3-flash-preview',
+    model: 'gemini-3-pro-preview',
     contents: {
       parts: [
         {
@@ -43,12 +48,19 @@ export const analyzeResumeImage = async (base64Data: string): Promise<ResumeData
           },
         },
         {
-          text: `You are an expert high-fidelity Resume Transcription and Design Analyst. 
-          Your goal is to "CLONE" the provided resume (Image or PDF) by extracting ALL content perfectly and identifying its visual DNA.
+          text: `Extract ALL text from this resume image precisely. Return clean, raw values only — no explanations, no reasoning, no annotations in the field values.
 
-          CRITICAL: Return ONLY raw JSON. Do not include any conversational text.
-          Transcribe precisely, capturing all text. Identify the dominant color and layout structure.
-          For the sections, map them to 'detail-list' (for experience/edu) or 'tag-list' (for skills/hobbies).`
+Rules:
+- fullName: person's name
+- jobTitle: their role/title  
+- email: email address
+- phone: phone number
+- dateOfBirth: birth date (e.g. "1997.01")
+- location: city/region
+- website: ONLY if a URL or social handle (WeChat ID etc.) exists, otherwise empty string
+- summary: professional summary paragraph
+- sections: use type "detail-list" for experience/education, "tag-list" for skills
+- Detect layout structure, font style, and accent color`
         },
       ],
     },
@@ -98,9 +110,9 @@ export const analyzeResumeImage = async (base64Data: string): Promise<ResumeData
           visualAnalysis: {
             type: Type.OBJECT,
             properties: {
-              structure: { 
-                type: Type.STRING, 
-                enum: ['classic', 'modern', 'minimal', 'sidebar-left', 'sidebar-right', 'two-column-header'] 
+              structure: {
+                type: Type.STRING,
+                enum: ['classic', 'modern', 'minimal', 'sidebar-left', 'sidebar-right', 'two-column-header']
               },
               headerAlignment: { type: Type.STRING, enum: ['left', 'center'] },
               fontStyle: { type: Type.STRING, enum: ['sans', 'serif'] },
@@ -112,8 +124,10 @@ export const analyzeResumeImage = async (base64Data: string): Promise<ResumeData
     }
   });
 
+  console.log("Resume analysis raw response:", response.text);
+
   if (!response.text) {
-    throw new Error("No response from Gemini.");
+    throw new Error("No response received from the analysis service.");
   }
 
   let rawData;
@@ -122,7 +136,7 @@ export const analyzeResumeImage = async (base64Data: string): Promise<ResumeData
     rawData = JSON.parse(cleanedJson);
   } catch (e) {
     console.error("JSON Parse Error. Raw Text:", response.text);
-    throw new Error("Failed to parse transcription from Gemini. The AI output was malformed.");
+    throw new Error("Failed to parse the analysis result. The model output was malformed.");
   }
 
   const sections: Section[] = (rawData.sections || []).map((sec: any) => ({
@@ -151,11 +165,11 @@ export const analyzeResumeImage = async (base64Data: string): Promise<ResumeData
   const visual = rawData.visualAnalysis || {};
   const detectedStructure = visual.structure || 'classic';
   const detectedFont = visual.fontStyle || 'sans';
-  
+
   let matchingTemplates = TEMPLATES.filter(t => t.structure === detectedStructure);
   if (matchingTemplates.length === 0) matchingTemplates = TEMPLATES.filter(t => t.structure === 'classic');
 
-  let bestTemplate = matchingTemplates.find(t => 
+  let bestTemplate = matchingTemplates.find(t =>
     (detectedFont === 'serif' && t.fonts.body.includes('serif')) ||
     (detectedFont === 'sans' && t.fonts.body.includes('sans'))
   );
@@ -179,8 +193,8 @@ export const analyzeResumeImage = async (base64Data: string): Promise<ResumeData
     summaryBottomSpacing: 32,
     sectionTitleMargin: 12,
     moduleSpacing: 24,
-    itemSpacing: 16, 
+    itemSpacing: 16,
     lineHeight: 1.5,
-    sourceImageUrl: base64Data 
+    sourceImageUrl: base64Data
   };
 };

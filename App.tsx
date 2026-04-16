@@ -8,7 +8,7 @@ import { saveAs } from 'file-saver';
 import ResumeEditor from './components/ResumeEditor';
 import ResumePreview from './components/ResumePreview';
 import { INITIAL_RESUME_DATA, EXAMPLE_RESUME_DATA, ResumeData, TEMPLATES } from './types';
-import { analyzeResumeImage } from './services/geminiService';
+import { analyzeResumeImage } from './services/resumeAnalysisService';
 import { generateDocx } from './utils/docxGenerator';
 
 const App: React.FC = () => {
@@ -70,7 +70,16 @@ const App: React.FC = () => {
       try {
         const json = JSON.parse(e.target?.result as string);
         if (json.personalInfo && json.sections) {
-          setResumeData(json);
+          // Merge with INITIAL_RESUME_DATA to ensure all styling properties (font sizes, spacing, etc.)
+          // are present even if the draft is from an older version or manually edited.
+          setResumeData({
+            ...INITIAL_RESUME_DATA,
+            ...json,
+            personalInfo: {
+              ...INITIAL_RESUME_DATA.personalInfo,
+              ...json.personalInfo
+            }
+          });
           setHasData(true);
           setView('editor');
           setError(null);
@@ -78,7 +87,7 @@ const App: React.FC = () => {
           throw new Error("Invalid draft file format");
         }
       } catch (err) {
-        setError("Could not load draft. Please ensure it's a valid ResumeCloner JSON file.");
+        setError("Could not load draft. Please ensure it's a valid JSON resume draft.");
       }
     };
     reader.readAsText(file);
@@ -209,12 +218,17 @@ const App: React.FC = () => {
   };
 
   const handleDownloadDocx = async () => {
+    console.log("handleDownloadDocx triggered");
     try {
+      console.log("Calling generateDocx...");
       const blob = await generateDocx(resumeData);
+      console.log("generateDocx returned successfully");
       const fileName = `${resumeData.personalInfo.fullName.replace(/\s+/g, '_') || 'Resume'}_Resume.docx`;
+      console.log("Starting file save dialog for:", fileName);
       await saveFileWithDialog(blob, fileName, 'Word Document', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', '.docx');
+      console.log("File save dialog completed");
     } catch (err) {
-      console.error("Word generation failed", err);
+      console.error("Word generation failed specifically in handleDownloadDocx:", err);
       alert("Failed to generate Word document.");
     }
   };
@@ -233,7 +247,7 @@ const App: React.FC = () => {
             <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white">
               <FileText size={20} />
             </div>
-            <span className="font-bold text-xl tracking-tight text-gray-800">Resume<span className="text-blue-600">Cloner</span> AI</span>
+            <span className="font-bold text-xl tracking-tight text-gray-800">Resume<span className="text-blue-600">Cloner</span></span>
           </div>
 
           <div className="flex items-center gap-4">
@@ -273,7 +287,7 @@ const App: React.FC = () => {
             <div className="max-w-4xl w-full text-center space-y-12 py-12">
               <div className="space-y-4">
                 <h1 className="text-5xl font-extrabold text-gray-900 tracking-tight leading-tight">Clone Any Resume <span className="text-blue-600">Instantly</span></h1>
-                <p className="text-xl text-gray-600 max-w-2xl mx-auto">Upload a screenshot or a PDF file. AI will extract everything for you to edit and customize.</p>
+                <p className="text-xl text-gray-600 max-w-2xl mx-auto">Upload a screenshot or PDF file. The analysis engine extracts content and layout into an editable draft.</p>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto">
@@ -478,7 +492,7 @@ const App: React.FC = () => {
             </div>
             <div className="text-center">
               <p className="text-2xl font-extrabold text-gray-900">Transcribing Source File...</p>
-              <p className="text-gray-500 mt-2">Gemini AI is extracting content and analyzing layout structures.</p>
+              <p className="text-gray-500 mt-2">The analysis engine is extracting content and detecting layout structure.</p>
             </div>
           </div>
         )}

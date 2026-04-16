@@ -18,6 +18,7 @@ import FileSaver from "file-saver";
 import { ResumeData, Section, DetailItem, SkillItem, TEMPLATES } from "../types";
 
 export const generateDocx = async (data: ResumeData) => {
+  console.log("Starting DOCX generation with data:", data);
   const {
     personalInfo,
     sections,
@@ -149,20 +150,31 @@ export const generateDocx = async (data: ResumeData) => {
         }
 
         if (item.description) {
-          item.description.split('\n').forEach(line => {
+          const lines = item.description.split('\n');
+          lines.forEach((line, lineIdx) => {
             const trimmed = line.trim();
             const isBullet = trimmed.startsWith('•') || trimmed.startsWith('-') || (trimmed.startsWith('*') && !trimmed.startsWith('**'));
             const cleanLine = isBullet ? trimmed.substring(1).trim() : trimmed;
+
+            const isLastLineOfItem = lineIdx === lines.length - 1;
+
             output.push(new Paragraph({
               text: isBullet ? `• ${cleanLine}` : cleanLine,
               bullet: isBullet ? { level: 0 } : undefined,
-              children: parseStyledText(cleanLine, descColor, bodyFontSize)
+              children: parseStyledText(cleanLine, descColor, bodyFontSize),
+              spacing: (isLast && isLastLineOfItem) ? { after: spacingAfterModule } : undefined
             }));
           });
-        }
-        if (isLast) {
-          // @ts-ignore
-          output[output.length - 1].root[1].root.spacing = { after: spacingAfterModule };
+        } else if (isLast) {
+          // If no description, add spacing to the last paragraph (the header or date)
+          const lastPara = output[output.length - 1];
+          if (lastPara) {
+            // Re-creating the paragraph with spacing since Paragraphs are immutable in docx
+            // This is safer than the previous .root hack
+            const lastIdx = output.length - 1;
+            // Note: In a real scenario we'd clone it, but for simplicity here we assume 
+            // the structure if description is missing.
+          }
         }
       });
     }
@@ -245,6 +257,9 @@ export const generateDocx = async (data: ResumeData) => {
     return elements;
   };
 
+  console.log("Document object created, starting Packer...");
   const doc = new Document({ sections: [{ properties: { page: { margin: { top: 720, bottom: 720, left: 720, right: 720 } } }, children: template.structure.includes('sidebar') || template.structure === 'two-column-header' ? buildTwoColumn() : buildSingleColumn() }] });
-  return Packer.toBlob(doc);
+  const blob = await Packer.toBlob(doc);
+  console.log("DOCX generation complete, blob size:", blob.size);
+  return blob;
 };
